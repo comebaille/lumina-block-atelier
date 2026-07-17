@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "art_direction": "Luxury nocturnal crystal atelier: deep indigo glass, iridescent cyan-violet-coral highlights, editorial spacing, restrained motion, and high-legibility mobile surfaces.",
+  "assets": [
+    {
+      "id": "crystal-sanctum-backdrop",
+      "origin": "generated",
+      "kind": "portrait mobile game background",
+      "generator": "OpenAI built-in image generation tool",
+      "prompt": "Use case: stylized-concept. Asset type: portrait mobile game background artwork. Primary request: create an original, premium abstract backdrop for a luxury block puzzle game; a deep midnight-indigo crystalline world with luminous aurora ribbons, soft pearlescent glass forms, tiny floating prism dust, and restrained celestial glow. Scene/backdrop: immersive vertical atmosphere with layered depth, darker quiet center for a game board, richer decorative energy around the outer edges and upper corners. Style/medium: high-end stylized 3D editorial game art, polished glassmorphism, silky volumetric lighting, subtle film grain, elegant and sophisticated rather than childish. Composition/framing: portrait 9:16 mobile wallpaper; no interface, no game board, no blocks; calm negative space through the central 60 percent; decorative light concentrated near edges; seamless crop-safe composition. Lighting/mood: nocturnal, mesmerizing, serene, premium; cyan, violet, electric coral and champagne highlights over a navy-black base. Materials/textures: frosted crystal, iridescent glass, satin haze, microscopic sparkling dust. Constraints: entirely original; no text; no logo; no watermark; no recognizable brand assets; no game UI; no grids; no hard frame; maintain strong legibility for white UI layered above. Avoid: cartoon characters, flat vector style, busy central focal point, neon cyberpunk signage, lens flare overuse, literal space planets.",
+      "rights_note": "Generated specifically for this original project with the built-in image generation tool; intended for distribution with the game under the applicable OpenAI service terms.",
+      "local_paths": [
+        "assets/art/crystal-sanctum.png",
+        "assets/art/crystal-sanctum.webp"
+      ],
+      "used_for": [
+        "full-screen hero backdrop",
+        "installable game visual identity"
+      ],
+      "modifications": "The generated 941x1672 PNG was encoded locally to a 112 KB WebP at quality 86 for the runtime; the PNG is retained as the documented source and fallback."
+    },
+    {
+      "id": "lumina-prism-icon-system",
+      "origin": "original",
+      "kind": "vector app icon and raster derivatives",
+      "local_paths": [
+        "assets/icons/icon.svg",
+        "assets/icons/icon-192.png",
+        "assets/icons/icon-512.png"
+      ],
+      "used_for": [
+        "PWA launcher icon",
+        "browser favicon",
+        "brand mark"
+      ],
+      "modifications": "Original SVG mark rasterized locally at 192x192 and 512x512 for mobile installation metadata."
+    },
+    {
+      "id": "lumina-crystal-materials",
+      "origin": "original",
+      "kind": "procedural CSS material and VFX system",
+      "local_paths": [
+        "styles.css"
+      ],
+      "used_for": [
+        "board crystals",
+        "tray fragments",
+        "glass panels",
+        "line-clear beams and particles"
+      ],
+      "modifications": "Five authored material palettes combine gradients, specular layers, shadows, restrained glows, and reduced-motion fallbacks."
+    },
+    {
+      "id": "lumina-interface-composition",
+      "origin": "original",
+      "kind": "semantic mobile game interface",
+      "local_paths": [
+        "index.html",
+        "styles.css"
+      ],
+      "used_for": [
+        "HUD",
+        "game board frame",
+        "welcome, pause, result, and settings flows"
+      ],
+      "modifications": "Authored as a responsive HTML layer with safe-area handling, roving board focus, touch targets, and high-contrast/reduced-motion modes."
+    }
+  ],
+  "visual_requirements": [
+    {
+      "id": "hero-backdrop",
+      "role": "Premium full-screen crystal environment",
+      "priority": "hero",
+      "strategy": "generated",
+      "asset_ids": [
+        "crystal-sanctum-backdrop"
+      ]
+    },
+    {
+      "id": "interactive-crystals",
+      "role": "Distinct tactile board and tray pieces",
+      "priority": "hero",
+      "strategy": "original",
+      "asset_ids": [
+        "lumina-crystal-materials"
+      ]
+    },
+    {
+      "id": "brand-and-installation",
+      "role": "Original LUMINA identity and launcher icon",
+      "priority": "major",
+      "strategy": "original",
+      "asset_ids": [
+        "lumina-prism-icon-system"
+      ]
+    },
+    {
+      "id": "mobile-interface",
+      "role": "Readable glass HUD, game shell, and modal flows",
+      "priority": "major",
+      "strategy": "original",
+      "asset_ids": [
+        "lumina-interface-composition"
+      ]
+    },
+    {
+      "id": "visual-feedback",
+      "role": "Placement, invalid move, clear, combo, and reward feedback",
+      "priority": "major",
+      "strategy": "original",
+      "asset_ids": [
+        "lumina-crystal-materials"
+      ]
+    }
+  ]
+}

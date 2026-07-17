@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Icône LUMINA</title>
+  <desc id="desc">Trois prismes lumineux formant une lettre L abstraite.</desc>
+  <defs>
+    <radialGradient id="bg" cx="32%" cy="18%" r="94%">
+      <stop offset="0" stop-color="#214d96" />
+      <stop offset=".46" stop-color="#12194f" />
+      <stop offset="1" stop-color="#070b27" />
+    </radialGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#b8fbff" />
+      <stop offset=".45" stop-color="#3be6ff" />
+      <stop offset="1" stop-color="#4873ff" />
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fff1ff" />
+      <stop offset=".42" stop-color="#d79aff" />
+      <stop offset="1" stop-color="#7b54ff" />
+    </linearGradient>
+    <linearGradient id="coral" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fff0cd" />
+      <stop offset=".42" stop-color="#ff9fc2" />
+      <stop offset="1" stop-color="#ff6e86" />
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="18" result="blur" />
+      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)" />
+  <circle cx="405" cy="87" r="105" fill="#7d55ff" opacity=".2" />
+  <circle cx="96" cy="432" r="126" fill="#2fe4ff" opacity=".13" />
+  <g filter="url(#glow)">
+    <rect x="139" y="118" width="106" height="106" rx="25" fill="url(#cyan)" transform="rotate(-8 192 171)" />
+    <rect x="147" y="236" width="106" height="106" rx="25" fill="url(#violet)" transform="rotate(4 200 289)" />
+    <rect x="264" y="250" width="106" height="106" rx="25" fill="url(#coral)" transform="rotate(-5 317 303)" />
+  </g>
+  <g fill="none" stroke="#fff" stroke-linecap="round" opacity=".65">
+    <path d="M161 137h54" stroke-width="9" />
+    <path d="M170 255h52" stroke-width="9" />
+    <path d="M286 269h51" stroke-width="9" />
+  </g>
+  <rect x="1.5" y="1.5" width="509" height="509" rx="114.5" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="3" />
+</svg>

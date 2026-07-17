@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0f35" />
+    <meta name="description" content="LUMINA, un puzzle de blocs tactile dans un écrin de cristal." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LUMINA" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./assets/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>LUMINA — Atelier de cristaux</title>
+  </head>
+  <body>
+    <div class="ambient" aria-hidden="true">
+      <span class="ambient__orb ambient__orb--one"></span>
+      <span class="ambient__orb ambient__orb--two"></span>
+      <span class="ambient__grain"></span>
+    </div>
+
+    <div id="app" class="game-app">
+      <header class="topbar">
+        <div class="brand" aria-label="LUMINA, Atelier de cristaux">
+          <span class="brand__mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="brand__copy">
+            <strong>LUMINA</strong>
+            <small>ATELIER DE CRISTAUX</small>
+          </span>
+        </div>
+
+        <nav class="topbar__actions" aria-label="Actions de partie">
+          <button id="soundButton" class="icon-button" type="button" aria-label="Couper le son" aria-pressed="true">
+            <svg class="icon icon--sound-on" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9.5v5h4l5 4V5.5l-5 4H4Z" />
+              <path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" />
+            </svg>
+            <svg class="icon icon--sound-off" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9.5v5h4l5 4V5.5l-5 4H4Z" />
+              <path d="m17 9 4 4m0-4-4 4" />
+            </svg>
+          </button>
+          <button id="settingsButton" class="icon-button" type="button" aria-label="Ouvrir les réglages">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 15.25A3.25 3.25 0 1 0 12 8.75a3.25 3.25 0 0 0 0 6.5Z" />
+              <path d="m19.1 13.2 1.2 1-.9 2.15-1.55-.14a7.9 7.9 0 0 1-1.65 1.65l.14 1.55-2.15.89-1-1.2a7.7 7.7 0 0 1-2.38 0l-1 1.2-2.15-.9.14-1.54a7.9 7.9 0 0 1-1.65-1.65l-1.55.14-.89-2.15 1.2-1a7.7 7.7 0 0 1 0-2.38l-1.2-1 .9-2.15 1.54.14A7.9 7.9 0 0 1 7.8 6.15L7.66 4.6l2.15-.89 1 1.2a7.7 7.7 0 0 1 2.38 0l1-1.2 2.15.9-.14 1.54a7.9 7.9 0 0 1 1.65 1.65l1.55-.14.89 2.15-1.2 1a7.7 7.7 0 0 1 0 2.38Z" />
+            </svg>
+          </button>
+          <button id="pauseButton" class="icon-button" type="button" aria-label="Mettre la partie en pause">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 6v12M16 6v12" />
+            </svg>
+          </button>
+        </nav>
+      </header>
+
+      <main class="game-main">
+        <section class="score-panel" aria-label="Score de la partie">
+          <div class="score-stat score-stat--side">
+            <span class="score-stat__label">RECORD</span>
+            <strong id="bestScore">0</strong>
+          </div>
+          <div class="score-stat score-stat--hero">
+            <span class="score-stat__label">SCORE</span>
+            <strong id="scoreValue">0</strong>
+            <span id="comboBadge" class="combo-badge" aria-hidden="true">COMBO ×2</span>
+          </div>
+          <div class="score-stat score-stat--side score-stat--right">
+            <span class="score-stat__label">LIGNES</span>
+            <strong id="linesValue">0</strong>
+          </div>
+        </section>
+
+        <section class="daily-card" aria-labelledby="dailyTitle">
+          <span class="daily-card__gem" aria-hidden="true"></span>
+          <div class="daily-card__copy">
+            <div class="daily-card__heading">
+              <strong id="dailyTitle">ÉCLAT DU JOUR</strong>
+              <span id="dailyProgressText">0 / 16</span>
+            </div>
+            <div class="progress-track" aria-hidden="true"><span id="dailyProgressBar"></span></div>
+          </div>
+          <span id="dailyReward" class="daily-card__reward">+300</span>
+        </section>
+
+        <section class="board-stage" aria-labelledby="boardTitle">
+          <h1 id="boardTitle" class="sr-only">Grille de jeu 8 par 8</h1>
+          <div class="board-aura" aria-hidden="true"></div>
+          <div class="board-frame">
+            <div id="board" class="board" role="group" aria-label="Grille 8 par 8" aria-describedby="boardHelp"></div>
+            <div id="clearBeam" class="clear-beam" aria-hidden="true"></div>
+            <div id="scoreBurst" class="score-burst" aria-hidden="true"></div>
+          </div>
+          <p id="boardHelp" class="sr-only">Choisissez une pièce puis touchez sa case d’ancrage, ou faites-la glisser sur la grille. Remplissez une ligne ou une colonne pour l’effacer.</p>
+          <div id="comboCallout" class="combo-callout" aria-hidden="true">
+            <span>PRISME PARFAIT</span>
+            <strong>COMBO ×2</strong>
+          </div>
+        </section>
+
+        <section class="tray" aria-labelledby="trayTitle">
+          <div class="tray__heading">
+            <h2 id="trayTitle">VOS FRAGMENTS</h2>
+            <p id="trayHint">Touchez ou faites glisser une pièce</p>
+          </div>
+          <div id="pieceRack" class="piece-rack"></div>
+        </section>
+      </main>
+
+      <footer class="game-footer">
+        <span id="saveStatus"><i aria-hidden="true"></i> Progression sauvegardée</span>
+        <button id="installButton" type="button" class="text-button" hidden>Installer</button>
+      </footer>
+    </div>
+
+    <div id="dragLayer" class="drag-layer" aria-hidden="true"></div>
+    <div id="particleLayer" class="particle-layer" aria-hidden="true"></div>
+    <div id="liveRegion" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <dialog id="welcomeDialog" class="game-dialog game-dialog--welcome" aria-labelledby="welcomeTitle">
+      <div class="dialog-sheen" aria-hidden="true"></div>
+      <div class="welcome-mark" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <p class="eyebrow">UNE EXPÉRIENCE DE CRISTAL</p>
+      <h2 id="welcomeTitle">LUMINA</h2>
+      <p class="dialog-lead">Composez. Alignez. Illuminez.</p>
+      <ol class="micro-tutorial" aria-label="Comment jouer">
+        <li><span aria-hidden="true">01</span><p><strong>Choisissez</strong> un fragment</p></li>
+        <li><span aria-hidden="true">02</span><p><strong>Posez-le</strong> sur la grille</p></li>
+        <li><span aria-hidden="true">03</span><p><strong>Complétez</strong> lignes et colonnes</p></li>
+      </ol>
+      <button id="startButton" class="primary-button" type="button"><span>Entrer dans l’atelier</span><i aria-hidden="true">→</i></button>
+      <button id="freshStartButton" class="dialog-link" type="button" hidden>Commencer une nouvelle partie</button>
+      <p class="dialog-footnote">Son et vibrations réglables à tout moment</p>
+    </dialog>
+
+    <dialog id="settingsDialog" class="game-dialog game-dialog--sheet" aria-labelledby="settingsTitle">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">VOTRE EXPÉRIENCE</p>
+          <h2 id="settingsTitle">Réglages</h2>
+        </div>
+        <button class="icon-button dialog-close" type="button" data-close-dialog="settingsDialog" aria-label="Fermer les réglages">×</button>
+      </div>
+      <div class="settings-list">
+        <label class="setting-row">
+          <span><strong>Ambiance sonore</strong><small>Notes cristallines et confirmations</small></span>
+          <input id="soundToggle" class="switch-input" type="checkbox" checked />
+          <i class="switch" aria-hidden="true"></i>
+        </label>
+        <label class="setting-row">
+          <span><strong>Vibrations</strong><small>Retours tactiles compatibles</small></span>
+          <input id="hapticToggle" class="switch-input" type="checkbox" checked />
+          <i class="switch" aria-hidden="true"></i>
+        </label>
+        <label class="setting-row">
+          <span><strong>Mouvements réduits</strong><small>Limite halos, particules et transitions</small></span>
+          <input id="motionToggle" class="switch-input" type="checkbox" />
+          <i class="switch" aria-hidden="true"></i>
+        </label>
+        <label class="setting-row">
+          <span><strong>Contraste renforcé</strong><small>Accentue la grille et les libellés</small></span>
+          <input id="contrastToggle" class="switch-input" type="checkbox" />
+          <i class="switch" aria-hidden="true"></i>
+        </label>
+      </div>
+      <button id="settingsInstallButton" class="secondary-button" type="button" hidden>Installer LUMINA</button>
+      <button id="resetButton" class="danger-button" type="button">Effacer la partie actuelle</button>
+      <p class="install-note">Sur iPhone : Safari → Partager → Sur l’écran d’accueil.</p>
+    </dialog>
+
+    <dialog id="pauseDialog" class="game-dialog game-dialog--compact" aria-labelledby="pauseTitle">
+      <div class="pause-gem" aria-hidden="true"></div>
+      <p class="eyebrow">LE TEMPS SUSPENDU</p>
+      <h2 id="pauseTitle">Pause</h2>
+      <p class="dialog-lead"><span id="pauseScore">0</span> points scintillent encore.</p>
+      <button id="resumeButton" class="primary-button" type="button"><span>Reprendre</span><i aria-hidden="true">→</i></button>
+      <button id="pauseNewButton" class="dialog-link" type="button">Nouvelle partie</button>
+    </dialog>
+
+    <dialog id="gameOverDialog" class="game-dialog game-dialog--compact" aria-labelledby="gameOverTitle">
+      <div class="game-over-halo" aria-hidden="true"></div>
+      <p class="eyebrow">LA GRILLE S’EST FIGÉE</p>
+      <h2 id="gameOverTitle">Bel éclat.</h2>
+      <div class="final-score">
+        <span>SCORE FINAL</span>
+        <strong id="finalScore">0</strong>
+      </div>
+      <p id="finalSummary" class="dialog-lead">0 lignes illuminées</p>
+      <button id="restartButton" class="primary-button" type="button"><span>Rejouer</span><i aria-hidden="true">↻</i></button>
+    </dialog>
+
+    <dialog id="confirmDialog" class="game-dialog game-dialog--compact" aria-labelledby="confirmTitle">
+      <p class="eyebrow">CONFIRMATION</p>
+      <h2 id="confirmTitle">Effacer la partie ?</h2>
+      <p class="dialog-lead">Le score actuel et la grille seront perdus. Votre record restera intact.</p>
+      <div class="confirm-actions">
+        <button id="cancelResetButton" class="secondary-button" type="button">Annuler</button>
+        <button id="confirmResetButton" class="danger-button danger-button--filled" type="button">Effacer</button>
+      </div>
+    </dialog>
+
+    <noscript>Cette expérience nécessite JavaScript pour fonctionner.</noscript>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

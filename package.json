@@ -1,0 +1,22 @@
+{
+  "name": "lumina-block-atelier",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "LUMINA, an original premium mobile block puzzle PWA.",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "check": "node scripts/verify.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:e2e": "node scripts/e2e.mjs",
+    "validate:assets": "python3 /Users/sarahmaibaille-barrelle/.codex/skills/build-games-with-assets/scripts/validate_asset_manifest.py . --allow-no-downloaded",
+    "verify": "npm run check && npm test && npm run validate:assets && npm run test:e2e"
+  },
+  "devDependencies": {
+    "axe-core": "^4.10.3",
+    "playwright-core": "^1.54.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
