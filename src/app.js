@@ -778,29 +778,30 @@ function updateDragTarget(clientX, clientY) {
   setPreview(piece, row, col, valid);
 }
 
-function renderDragFrame(timestamp) {
+function renderDragFrame() {
   if (!dragState?.active || !dragState.visual || !activeGhost) {
     dragAnimationFrame = null;
     return;
   }
 
   const visual = dragState.visual;
-  const elapsed = Math.min(40, Math.max(1, timestamp - visual.lastFrameAt));
+  const frameNow = performance.now();
+  const elapsed = Math.min(40, Math.max(1, frameNow - visual.lastFrameAt));
   const follow = settings.reducedMotion
     ? 1
     : 1 - Math.exp((-GAME_FEEL.dragFollowSharpness * elapsed) / 1_000);
   visual.currentX += (visual.targetX - visual.currentX) * follow;
   visual.currentY += (visual.targetY - visual.currentY) * follow;
-  visual.lastFrameAt = timestamp;
+  visual.lastFrameAt = frameNow;
   activeGhost.style.setProperty("--ghost-x", `${visual.currentX.toFixed(2)}px`);
   activeGhost.style.setProperty("--ghost-y", `${visual.currentY.toFixed(2)}px`);
 
   if (!visual.measuredFirstFrame) {
-    recordMetric(inputMetrics.activationToFrame, Math.max(0, timestamp - visual.activationAt));
+    recordMetric(inputMetrics.activationToFrame, frameNow - visual.activationAt);
     visual.measuredFirstFrame = true;
   }
   if (visual.targetUpdatedAt !== visual.lastMeasuredUpdateAt) {
-    recordMetric(inputMetrics.moveToFrame, Math.max(0, timestamp - visual.targetUpdatedAt));
+    recordMetric(inputMetrics.moveToFrame, frameNow - visual.targetUpdatedAt);
     visual.lastMeasuredUpdateAt = visual.targetUpdatedAt;
   }
 
