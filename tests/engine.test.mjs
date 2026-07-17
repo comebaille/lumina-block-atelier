@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  ALL_CLEAR_BONUS,
   BOARD_SIZE,
+  COMBO_GRACE_MOVES,
   calculateMoveScore,
   canAnyPieceFit,
   canPlace,
@@ -57,26 +59,57 @@ test("completed rows and columns are detected and cleared simultaneously", () =>
   assert.ok(cleared.every((row) => row[5] === null));
 });
 
-test("resolving a move awards placement, line, and combo points", () => {
+test("resolving a move awards points only for the clear and continues the combo", () => {
   const board = createEmptyBoard();
   for (let col = 0; col < 7; col += 1) board[0][col] = "gold";
-  const result = resolvePlacement(board, piece("spark", "coral"), 0, 7, 1);
+  board[2][2] = "mint";
+  const result = resolvePlacement(board, piece("spark", "coral"), 0, 7, 1, COMBO_GRACE_MOVES);
 
   assert.deepEqual(result.completed.rows, [0]);
-  assert.equal(result.score.placementPoints, 10);
-  assert.equal(result.score.lineBonus, 240);
-  assert.equal(result.score.total, 250);
+  assert.equal(result.score.placementPoints, 0);
+  assert.equal(result.score.baseClearPoints, 100);
+  assert.equal(result.score.multiplier, 1.5);
+  assert.equal(result.score.lineBonus, 150);
+  assert.equal(result.score.total, 150);
   assert.equal(result.score.nextCombo, 2);
+  assert.equal(result.score.nextComboGrace, COMBO_GRACE_MOVES);
+  assert.equal(result.isAllClear, false);
   assert.ok(result.boardAfterClear[0].every((cell) => cell === null));
 });
 
-test("a move without a line resets the combo", () => {
-  assert.deepEqual(calculateMoveScore(4, 0, 5), {
-    placementPoints: 40,
-    lineBonus: 0,
-    total: 40,
-    nextCombo: 0
-  });
+test("placements award zero points and the combo survives exactly three empty moves", () => {
+  const firstMiss = calculateMoveScore(4, 0, 5, COMBO_GRACE_MOVES);
+  const secondMiss = calculateMoveScore(3, 0, firstMiss.nextCombo, firstMiss.nextComboGrace);
+  const thirdMiss = calculateMoveScore(2, 0, secondMiss.nextCombo, secondMiss.nextComboGrace);
+
+  assert.equal(firstMiss.total, 0);
+  assert.equal(firstMiss.placementPoints, 0);
+  assert.deepEqual(
+    [firstMiss.nextComboGrace, secondMiss.nextComboGrace, thirdMiss.nextComboGrace],
+    [2, 1, 0]
+  );
+  assert.equal(firstMiss.nextCombo, 5);
+  assert.equal(secondMiss.nextCombo, 5);
+  assert.equal(thirdMiss.nextCombo, 0);
+});
+
+test("simultaneous rows and columns raise both the triangular base and combo", () => {
+  const score = calculateMoveScore(5, 3, 2, 2);
+  assert.equal(score.baseClearPoints, 600);
+  assert.equal(score.nextCombo, 5);
+  assert.equal(score.multiplier, 3);
+  assert.equal(score.total, 1_800);
+});
+
+test("emptying the complete board grants the all-clear surcharge", () => {
+  const board = createEmptyBoard();
+  for (let col = 0; col < 7; col += 1) board[0][col] = "gold";
+  const result = resolvePlacement(board, piece("spark", "coral"), 0, 7);
+
+  assert.equal(result.isAllClear, true);
+  assert.equal(result.score.allClearBonus, ALL_CLEAR_BONUS);
+  assert.equal(result.score.total, 100 + ALL_CLEAR_BONUS);
+  assert.ok(result.boardAfterClear.every((row) => row.every((cell) => cell === null)));
 });
 
 test("generated trays are deterministic with a seed and begin with a playable piece", () => {

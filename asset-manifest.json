@@ -20,6 +20,60 @@
       "modifications": "The generated 941x1672 PNG was encoded locally to a 112 KB WebP at quality 86 for the runtime; the PNG is retained as the documented source and fallback."
     },
     {
+      "id": "lumina-opal-material",
+      "origin": "generated",
+      "kind": "seamless mobile puzzle block material",
+      "generator": "OpenAI built-in image generation tool",
+      "prompt": "Use case: stylized-concept. Asset type: seamless tileable game material texture for small glossy puzzle blocks. Primary request: luminous pearlescent opal with milky translucent depth, subtle cyan, lavender and rose fire, delicate flowing mineral bands and tiny crystalline inclusions. Style/medium: premium stylized 3D material reference, polished luxury mobile game surface. Composition/framing: orthographic square texture, edge-to-edge, uniform detail density, no central focal point. Lighting/mood: soft internal iridescence, controlled highlights, readable even when cropped into very small squares. Materials/textures: natural opal, mother-of-pearl, translucent mineral layers. Constraints: seamless repeat on all four edges; no objects; no frame; no text; no logo; no watermark; no cast shadows; no perspective; no recognizable brand assets. Avoid: large gemstones, jewelry, dark empty patches, hard directional lighting.",
+      "rights_note": "Generated specifically for this original project with the built-in image generation tool; intended for distribution with the game under the applicable OpenAI service terms.",
+      "local_paths": [
+        "assets/materials/opal-source.png",
+        "assets/materials/opal.webp"
+      ],
+      "used_for": [
+        "opal board blocks",
+        "opal tray pieces",
+        "material identity badge"
+      ],
+      "modifications": "The 1254x1254 generated PNG is retained as source and was resized to 1024x1024 then encoded to WebP at quality 84 for runtime use."
+    },
+    {
+      "id": "lumina-solar-material",
+      "origin": "generated",
+      "kind": "seamless mobile puzzle block material",
+      "generator": "OpenAI built-in image generation tool",
+      "prompt": "Use case: stylized-concept. Asset type: seamless tileable game material texture for small glossy puzzle blocks. Primary request: molten solar glass with glowing champagne-gold and coral magma veins running through polished deep amber crystal, fine ember specks and controlled heat shimmer. Style/medium: premium stylized 3D material reference, elegant fantasy glass rather than rough lava. Composition/framing: orthographic square texture, edge-to-edge, uniform micro-detail, no central focal point. Lighting/mood: radiant inner warmth with crisp gold highlights, dramatic but readable on tiny mobile tiles. Materials/textures: polished volcanic glass, liquid gold filaments, microscopic embers. Constraints: seamless repeat on all four edges; no objects; no frame; no text; no logo; no watermark; no cast shadows; no perspective; no recognizable brand assets. Avoid: realistic flames, large cracks, black empty regions, cartoon lava.",
+      "rights_note": "Generated specifically for this original project with the built-in image generation tool; intended for distribution with the game under the applicable OpenAI service terms.",
+      "local_paths": [
+        "assets/materials/solar-source.png",
+        "assets/materials/solar.webp"
+      ],
+      "used_for": [
+        "solar glass board blocks",
+        "solar glass tray pieces",
+        "material identity badge"
+      ],
+      "modifications": "The 1254x1254 generated PNG is retained as source and was resized to 1024x1024 then encoded to WebP at quality 84 for runtime use."
+    },
+    {
+      "id": "lumina-void-material",
+      "origin": "generated",
+      "kind": "seamless mobile puzzle block material",
+      "generator": "OpenAI built-in image generation tool",
+      "prompt": "Use case: stylized-concept. Asset type: seamless tileable game material texture for small glossy puzzle blocks. Primary request: cosmic obsidian velvet with deep indigo and midnight-violet mineral grain, very fine silver and cyan star flecks, subtle topographic waves and hairline luminous fissures. Style/medium: premium stylized 3D material reference, sophisticated nocturnal luxury game surface. Composition/framing: orthographic square texture, edge-to-edge, uniform fine detail, no central focal point. Lighting/mood: mysterious restrained inner glow, high clarity when cropped into tiny squares. Materials/textures: polished obsidian, velvet mineral grain, microscopic stardust. Constraints: seamless repeat on all four edges; no objects; no frame; no text; no logo; no watermark; no cast shadows; no perspective; no recognizable brand assets. Avoid: literal planets, galaxies with large focal centers, near-black featureless areas, noisy glitter.",
+      "rights_note": "Generated specifically for this original project with the built-in image generation tool; intended for distribution with the game under the applicable OpenAI service terms.",
+      "local_paths": [
+        "assets/materials/void-source.png",
+        "assets/materials/void.webp"
+      ],
+      "used_for": [
+        "obsidian board blocks",
+        "obsidian tray pieces",
+        "material identity badge"
+      ],
+      "modifications": "The 1254x1254 generated PNG is retained as source and was resized to 1024x1024 then encoded to WebP at quality 84 for runtime use."
+    },
+    {
       "id": "lumina-prism-icon-system",
       "origin": "original",
       "kind": "vector app icon and raster derivatives",
@@ -48,7 +102,7 @@
         "glass panels",
         "line-clear beams and particles"
       ],
-      "modifications": "Five authored material palettes combine gradients, specular layers, shadows, restrained glows, and reduced-motion fallbacks."
+      "modifications": "Five authored color palettes combine with four evolving material families, specular layers, shadows, glows, board-wide shockwaves, sparks, and reduced-motion fallbacks."
     },
     {
       "id": "lumina-interface-composition",
@@ -82,7 +136,10 @@
       "priority": "hero",
       "strategy": "original",
       "asset_ids": [
-        "lumina-crystal-materials"
+        "lumina-crystal-materials",
+        "lumina-opal-material",
+        "lumina-solar-material",
+        "lumina-void-material"
       ]
     },
     {
@@ -109,7 +166,10 @@
       "priority": "major",
       "strategy": "original",
       "asset_ids": [
-        "lumina-crystal-materials"
+        "lumina-crystal-materials",
+        "lumina-opal-material",
+        "lumina-solar-material",
+        "lumina-void-material"
       ]
     }
   ]

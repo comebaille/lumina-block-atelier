@@ -1,4 +1,6 @@
 export const BOARD_SIZE = 8;
+export const COMBO_GRACE_MOVES = 3;
+export const ALL_CLEAR_BONUS = 2_500;
 
 export const PALETTES = ["cyan", "violet", "coral", "gold", "mint"];
 
@@ -207,28 +209,81 @@ export function generateTray(board, random = Math.random, count = 3) {
   return tray;
 }
 
-export function calculateMoveScore(pieceCellCount, lineCount, previousCombo) {
-  const placementPoints = pieceCellCount * 10;
-  if (lineCount === 0) {
-    return { placementPoints, lineBonus: 0, total: placementPoints, nextCombo: 0 };
-  }
-
-  const nextCombo = previousCombo + 1;
-  const multiLineBonus = Math.max(0, lineCount - 1) * 90;
-  const lineBonus = lineCount * 120 * nextCombo + multiLineBonus;
-  return { placementPoints, lineBonus, total: placementPoints + lineBonus, nextCombo };
+export function getComboMultiplier(combo) {
+  return Math.min(12, 1 + Math.max(0, combo - 1) * 0.5);
 }
 
-export function resolvePlacement(board, piece, anchorRow, anchorCol, previousCombo = 0) {
+export function calculateMoveScore(
+  pieceCellCount,
+  lineCount,
+  previousCombo = 0,
+  previousComboGrace = 0,
+  { allClear = false } = {}
+) {
+  const placementPoints = 0;
+
+  if (lineCount === 0) {
+    const nextComboGrace = previousCombo > 0 ? Math.max(0, previousComboGrace - 1) : 0;
+    const nextCombo = nextComboGrace > 0 ? previousCombo : 0;
+    return {
+      placementPoints,
+      baseClearPoints: 0,
+      lineBonus: 0,
+      allClearBonus: 0,
+      multiplier: getComboMultiplier(nextCombo),
+      total: 0,
+      nextCombo,
+      nextComboGrace
+    };
+  }
+
+  const comboContinues = previousCombo > 0 && previousComboGrace > 0;
+  const nextCombo = (comboContinues ? previousCombo : 0) + lineCount;
+  const nextComboGrace = COMBO_GRACE_MOVES;
+  const baseClearPoints = 100 * ((lineCount * (lineCount + 1)) / 2);
+  const multiplier = getComboMultiplier(nextCombo);
+  const lineBonus = Math.round(baseClearPoints * multiplier);
+  const allClearBonus = allClear ? ALL_CLEAR_BONUS : 0;
+
+  return {
+    placementPoints,
+    baseClearPoints,
+    lineBonus,
+    allClearBonus,
+    multiplier,
+    total: lineBonus + allClearBonus,
+    nextCombo,
+    nextComboGrace
+  };
+}
+
+export function resolvePlacement(
+  board,
+  piece,
+  anchorRow,
+  anchorCol,
+  previousCombo = 0,
+  previousComboGrace = 0
+) {
   const boardAfterPlacement = placePiece(board, piece, anchorRow, anchorCol);
   const completed = findCompletedLines(boardAfterPlacement);
-  const score = calculateMoveScore(getPieceCells(piece).length, completed.rows.length + completed.cols.length, previousCombo);
+  const boardAfterClear = clearCompletedLines(boardAfterPlacement, completed);
+  const lineCount = completed.rows.length + completed.cols.length;
+  const isAllClear = lineCount > 0 && countOccupied(boardAfterClear) === 0;
+  const score = calculateMoveScore(
+    getPieceCells(piece).length,
+    lineCount,
+    previousCombo,
+    previousComboGrace,
+    { allClear: isAllClear }
+  );
 
   return {
     boardAfterPlacement,
-    boardAfterClear: clearCompletedLines(boardAfterPlacement, completed),
+    boardAfterClear,
     completed,
     score,
+    isAllClear,
     placedCells: getPlacedCoordinates(piece, anchorRow, anchorCol)
   };
 }

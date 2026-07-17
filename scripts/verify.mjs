@@ -12,6 +12,9 @@ const requiredFiles = [
   "src/audio.js",
   "src/engine.js",
   "assets/art/crystal-sanctum.webp",
+  "assets/materials/opal.webp",
+  "assets/materials/solar.webp",
+  "assets/materials/void.webp",
   "assets/icons/icon.svg",
   "assets/icons/icon-192.png",
   "assets/icons/icon-512.png",
@@ -46,6 +49,11 @@ for (const requiredFragment of ['lang="fr"', "viewport-fit=cover", "apple-mobile
 
 const webpSize = statSync(resolve(root, "assets/art/crystal-sanctum.webp")).size;
 if (webpSize > 250_000) errors.push(`Hero WebP exceeds the 250 KB visual budget: ${webpSize} bytes`);
+
+for (const material of ["opal", "solar", "void"]) {
+  const materialSize = statSync(resolve(root, `assets/materials/${material}.webp`)).size;
+  if (materialSize > 350_000) errors.push(`${material} material WebP exceeds the 350 KB budget: ${materialSize} bytes`);
+}
 
 const textExtensions = new Set([".html", ".css", ".js", ".json", ".webmanifest", ".md"]);
 for (const file of requiredFiles) {

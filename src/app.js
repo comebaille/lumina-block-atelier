@@ -1,4 +1,5 @@
 import {
+  COMBO_GRACE_MOVES,
   BOARD_SIZE,
   PALETTES,
   canAnyPieceFit,
@@ -8,6 +9,7 @@ import {
   generateTray,
   getPieceCells,
   getPieceDimensions,
+  getComboMultiplier,
   getPlacedCoordinates,
   getShape,
   isValidBoard,
@@ -24,6 +26,20 @@ const STORAGE_KEYS = {
 
 const DAILY_TARGET = 16;
 const DAILY_REWARD = 300;
+const MATERIALS = Object.freeze([
+  { id: "prism", name: "PRISME" },
+  { id: "opal", name: "OPALE" },
+  { id: "solar", name: "SOLAIRE" },
+  { id: "void", name: "OBSIDIENNE" }
+]);
+const GAME_FEEL = Object.freeze({
+  dragThreshold: 4,
+  dragFollowSharpness: 38,
+  dragLiftRatio: 0.115,
+  dragLiftMin: 74,
+  dragLiftMax: 104,
+  metricSampleLimit: 90
+});
 const numberFormatter = new Intl.NumberFormat("fr-FR");
 const audio = new CrystalAudio();
 
@@ -35,9 +51,15 @@ const dom = {
   bestScore: document.querySelector("#bestScore"),
   lines: document.querySelector("#linesValue"),
   comboBadge: document.querySelector("#comboBadge"),
+  comboBadgeValue: document.querySelector("#comboBadgeValue"),
+  comboGrace: document.querySelector("#comboGrace"),
   comboCallout: document.querySelector("#comboCallout"),
   scoreBurst: document.querySelector("#scoreBurst"),
   clearBeam: document.querySelector("#clearBeam"),
+  boardFlash: document.querySelector("#boardFlash"),
+  boardShockwave: document.querySelector("#boardShockwave"),
+  materialBadge: document.querySelector("#materialBadge"),
+  materialName: document.querySelector("#materialName"),
   trayHint: document.querySelector("#trayHint"),
   dailyCard: document.querySelector(".daily-card"),
   dailyProgressText: document.querySelector("#dailyProgressText"),
@@ -92,6 +114,18 @@ let dialogReturnFocus = new WeakMap();
 let dragState = null;
 let activeGhost = null;
 let previewCells = [];
+let dragAnimationFrame = null;
+const inputMetrics = {
+  activationToFrame: [],
+  moveToFrame: []
+};
+const effectTimers = {
+  beam: null,
+  board: null,
+  combo: null,
+  material: null,
+  score: null
+};
 
 const storedSettings = readJson(STORAGE_KEYS.settings, {});
 const settings = { ...DEFAULT_SETTINGS, ...storedSettings };
@@ -123,6 +157,8 @@ function createFreshState() {
     score: 0,
     lines: 0,
     combo: 0,
+    comboGrace: 0,
+    materialIndex: 0,
     moves: 0,
     best: readNumber(STORAGE_KEYS.best),
     started: false,
@@ -157,6 +193,13 @@ function loadSavedState() {
     score: asNonNegativeInteger(raw.score),
     lines: asNonNegativeInteger(raw.lines),
     combo: asNonNegativeInteger(raw.combo),
+    comboGrace: Math.min(
+      COMBO_GRACE_MOVES,
+      raw.comboGrace === undefined && asNonNegativeInteger(raw.combo) > 0
+        ? COMBO_GRACE_MOVES
+        : asNonNegativeInteger(raw.comboGrace)
+    ),
+    materialIndex: asNonNegativeInteger(raw.materialIndex) % MATERIALS.length,
     moves: asNonNegativeInteger(raw.moves),
     best: Math.max(readNumber(STORAGE_KEYS.best), asNonNegativeInteger(raw.best)),
     started: false,
@@ -218,12 +261,14 @@ function writeStorage(key, value) {
 
 function saveGame() {
   const savePayload = {
-    version: 1,
+    version: 2,
     board: state.board,
     tray: state.tray,
     score: state.score,
     lines: state.lines,
     combo: state.combo,
+    comboGrace: state.comboGrace,
+    materialIndex: state.materialIndex,
     moves: state.moves,
     best: state.best
   };
@@ -251,6 +296,7 @@ function removeCurrentSave() {
 }
 
 function renderAll() {
+  applyMaterial();
   renderBoard();
   renderRack();
   renderStats(false);
@@ -281,6 +327,7 @@ function renderBoard({ newCells = [], clearingCells = [] } = {}) {
       button.dataset.index = String(index);
       button.dataset.validAnchor = String(validAnchor);
       button.tabIndex = index === boardFocusIndex ? 0 : -1;
+      button.style.setProperty("--material-position", `${col * 19}px ${row * 23}px`);
 
       if (palette) button.classList.add("is-filled", `palette-${palette}`);
       if (newKeys.has(key)) button.classList.add("is-new");
@@ -344,6 +391,7 @@ function createPieceGrid(piece, kind = "piece") {
     cell.className = `${kind === "drag" ? "drag-mini-cell" : "piece-mini-cell"} palette-${piece.palette}`;
     cell.style.setProperty("--cell-x", col + 1);
     cell.style.setProperty("--cell-y", row + 1);
+    cell.style.setProperty("--material-position", `${col * 17}px ${row * 21}px`);
     grid.append(cell);
   }
 
@@ -373,14 +421,40 @@ function renderStats(animate = true) {
   dom.score.textContent = numberFormatter.format(state.score);
   dom.bestScore.textContent = numberFormatter.format(state.best);
   dom.lines.textContent = numberFormatter.format(state.lines);
-  dom.comboBadge.textContent = `COMBO ×${Math.max(2, state.combo)}`;
-  dom.comboBadge.classList.toggle("is-visible", state.combo >= 2);
+  dom.comboBadgeValue.textContent = `COMBO ${Math.max(1, state.combo)} · ×${formatMultiplier(getComboMultiplier(state.combo))}`;
+  dom.comboBadge.classList.toggle("is-visible", state.combo > 0);
+  [...dom.comboGrace.children].forEach((pip, index) => {
+    pip.classList.toggle("is-active", index < state.comboGrace);
+  });
 
   if (animate && !settings.reducedMotion) {
     dom.score.classList.remove("is-bumping");
     requestAnimationFrame(() => dom.score.classList.add("is-bumping"));
     window.setTimeout(() => dom.score.classList.remove("is-bumping"), 260);
   }
+}
+
+function formatMultiplier(multiplier) {
+  return Number.isInteger(multiplier) ? String(multiplier) : multiplier.toFixed(1).replace(".", ",");
+}
+
+function applyMaterial({ animate = false } = {}) {
+  const material = MATERIALS[state.materialIndex] || MATERIALS[0];
+  document.body.dataset.material = material.id;
+  dom.materialName.textContent = material.name;
+
+  if (animate) {
+    window.clearTimeout(effectTimers.material);
+    dom.materialBadge.classList.remove("is-changing");
+    requestAnimationFrame(() => dom.materialBadge.classList.add("is-changing"));
+    effectTimers.material = window.setTimeout(() => dom.materialBadge.classList.remove("is-changing"), 1_050);
+  }
+}
+
+function advanceMaterial() {
+  state.materialIndex = (state.materialIndex + 1) % MATERIALS.length;
+  applyMaterial({ animate: true });
+  return MATERIALS[state.materialIndex];
 }
 
 function renderDaily() {
@@ -423,40 +497,57 @@ async function commitPlacement(index, row, col) {
   clearHint();
   clearPreview();
   const previousDaily = state.dailyLines;
-  const resolution = resolvePlacement(state.board, piece, row, col, state.combo);
+  const previousCombo = state.combo;
+  const resolution = resolvePlacement(state.board, piece, row, col, state.combo, state.comboGrace);
   const lineCount = resolution.completed.rows.length + resolution.completed.cols.length;
 
   state.board = resolution.boardAfterPlacement;
   state.tray[index] = null;
   state.score += resolution.score.total;
   state.combo = resolution.score.nextCombo;
+  state.comboGrace = resolution.score.nextComboGrace;
   state.moves += 1;
   state.lines += lineCount;
   state.dailyLines += lineCount;
   state.best = Math.max(state.best, state.score);
   selectedPieceIndex = null;
+  dom.trayHint.textContent = "Touchez ou faites glisser une pièce";
 
   renderBoard({ newCells: resolution.placedCells, clearingCells: resolution.completed.cells });
   renderRack();
-  renderStats();
+  renderStats(lineCount > 0);
   renderDaily();
-  showScoreBurst(resolution.score.total);
   audio.place(getPieceCells(piece).length);
-  haptic(lineCount ? [12, 28, 18] : 12);
+  haptic(resolution.isAllClear ? [16, 24, 24, 38, 34] : lineCount ? [12, 28, 18] : 10);
 
   if (lineCount > 0) {
-    window.setTimeout(() => audio.clear(lineCount, state.combo), 60);
-    triggerClearEffects(resolution.completed.cells, lineCount, state.combo);
-    announce(
-      `${lineCount} ${lineCount > 1 ? "lignes effacées" : "ligne effacée"}. ${resolution.score.total} points. ${
-        state.combo >= 2 ? `Combo ${state.combo}.` : ""
-      }`
+    showScoreBurst(
+      resolution.score.total,
+      resolution.isAllClear ? "SURCHARGE" : lineCount > 1 ? `${lineCount} ALIGNEMENTS` : "RÉSONANCE"
     );
-    await wait(settings.reducedMotion ? 20 : 390);
+    window.setTimeout(() => audio.clear(lineCount, state.combo), 60);
+    triggerClearEffects(resolution.completed.cells, lineCount, state.combo, resolution.score, resolution.isAllClear);
+    announce(
+      `${lineCount} ${lineCount > 1 ? "alignements effacés" : "alignement effacé"}. ${resolution.score.total} points. ` +
+      `Combo ${state.combo}, multiplicateur ${formatMultiplier(resolution.score.multiplier)}.` +
+      (resolution.isAllClear ? " Grille entièrement purifiée." : "")
+    );
+    await wait(settings.reducedMotion ? 20 : resolution.isAllClear ? 610 : 470);
     state.board = resolution.boardAfterClear;
+    const nextMaterial = advanceMaterial();
     renderBoard();
+    announce(`Nouvelle matière : ${nextMaterial.name.toLowerCase()}.`);
   } else {
-    announce(`${getPieceCells(piece).length * 10} points.`);
+    if (previousCombo > 0 && state.combo === 0) {
+      showComboBreak();
+      announce("Fragment posé, aucun point. La chaîne de combo est rompue.");
+    } else if (state.combo > 0) {
+      announce(
+        `Fragment posé, aucun point. Combo ${state.combo} conservé encore ${state.comboGrace} ${state.comboGrace > 1 ? "poses" : "pose"}.`
+      );
+    } else {
+      announce("Fragment posé, aucun point. Complétez une ligne ou une colonne pour marquer.");
+    }
   }
 
   if (previousDaily < DAILY_TARGET && state.dailyLines >= DAILY_TARGET && !state.dailyClaimed) {
@@ -503,53 +594,124 @@ function invalidPlacement(piece, row, col) {
   }, 340);
 }
 
-function triggerClearEffects(cells, lineCount, combo) {
+function triggerClearEffects(cells, lineCount, combo, score, isAllClear) {
+  window.clearTimeout(effectTimers.beam);
+  window.clearTimeout(effectTimers.board);
+  window.clearTimeout(effectTimers.combo);
   dom.clearBeam.classList.remove("is-active");
+  dom.boardFlash.classList.remove("is-active", "is-all-clear");
+  dom.boardShockwave.classList.remove("is-active", "is-all-clear");
+  dom.board.closest(".board-frame")?.classList.remove("is-impacting", "is-all-clear");
+  document.body.classList.remove("is-grid-purified");
+
   requestAnimationFrame(() => dom.clearBeam.classList.add("is-active"));
-  window.setTimeout(() => dom.clearBeam.classList.remove("is-active"), 470);
+  requestAnimationFrame(() => {
+    dom.boardFlash.classList.add("is-active");
+    dom.boardShockwave.classList.add("is-active");
+    dom.board.closest(".board-frame")?.classList.add("is-impacting");
+    if (isAllClear) {
+      dom.boardFlash.classList.add("is-all-clear");
+      dom.boardShockwave.classList.add("is-all-clear");
+      dom.board.closest(".board-frame")?.classList.add("is-all-clear");
+      document.body.classList.add("is-grid-purified");
+    }
+  });
+  effectTimers.beam = window.setTimeout(() => dom.clearBeam.classList.remove("is-active"), 470);
+  effectTimers.board = window.setTimeout(() => {
+    dom.boardFlash.classList.remove("is-active", "is-all-clear");
+    dom.boardShockwave.classList.remove("is-active", "is-all-clear");
+    dom.board.closest(".board-frame")?.classList.remove("is-impacting", "is-all-clear");
+    document.body.classList.remove("is-grid-purified");
+  }, isAllClear ? 1_050 : 720);
 
   const boardRect = dom.board.getBoundingClientRect();
-  burstParticles(boardRect.left + boardRect.width / 2, boardRect.top + boardRect.height / 2, Math.min(30, 12 + cells.length));
+  burstParticles(
+    boardRect.left + boardRect.width / 2,
+    boardRect.top + boardRect.height / 2,
+    isAllClear ? 56 : Math.min(38, 16 + cells.length),
+    { distanceMin: 58, distanceMax: isAllClear ? 240 : 160, spark: true }
+  );
 
-  if (combo >= 2 || lineCount >= 2) {
-    dom.comboCallout.querySelector("span").textContent = lineCount >= 2 ? "DOUBLE RÉSONANCE" : "PRISME PARFAIT";
-    dom.comboCallout.querySelector("strong").textContent = combo >= 2 ? `COMBO ×${combo}` : `${lineCount} LIGNES`;
-    dom.comboCallout.classList.remove("is-active");
-    requestAnimationFrame(() => dom.comboCallout.classList.add("is-active"));
-    window.setTimeout(() => dom.comboCallout.classList.remove("is-active"), 1_150);
-  }
+  const cellNodes = cells
+    .map(([row, col]) => dom.board.querySelector(`[data-row="${row}"][data-col="${col}"]`))
+    .filter(Boolean);
+  const stride = Math.max(1, Math.ceil(cellNodes.length / (isAllClear ? 32 : 18)));
+  cellNodes.forEach((cell, index) => {
+    if (index % stride !== 0) return;
+    const rect = cell.getBoundingClientRect();
+    burstParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, isAllClear ? 4 : 3, {
+      distanceMin: 20,
+      distanceMax: isAllClear ? 105 : 74,
+      spark: true
+    });
+  });
+
+  const title = isAllClear
+    ? "GRILLE ABSOLUE"
+    : lineCount >= 3
+      ? `${lineCount} ALIGNEMENTS`
+      : lineCount === 2
+        ? "DOUBLE RÉSONANCE"
+        : "LIGNE CHARGÉE";
+  dom.comboCallout.dataset.effect = isAllClear ? "all-clear" : "clear";
+  dom.comboCallout.querySelector("span").textContent = title;
+  dom.comboCallout.querySelector("strong").textContent = isAllClear
+    ? `SURCHARGE +${numberFormatter.format(score.total)}`
+    : `COMBO ${combo} · ×${formatMultiplier(score.multiplier)}`;
+  dom.comboCallout.classList.remove("is-active", "is-break", "is-all-clear");
+  requestAnimationFrame(() => {
+    dom.comboCallout.classList.add("is-active");
+    if (isAllClear) dom.comboCallout.classList.add("is-all-clear");
+  });
+  effectTimers.combo = window.setTimeout(() => {
+    dom.comboCallout.classList.remove("is-active", "is-all-clear");
+  }, isAllClear ? 1_520 : 1_180);
+}
+
+function showComboBreak() {
+  window.clearTimeout(effectTimers.combo);
+  dom.comboCallout.querySelector("span").textContent = "CHAÎNE ROMPUE";
+  dom.comboCallout.querySelector("strong").textContent = "REPARTEZ À ×1";
+  dom.comboCallout.dataset.effect = "break";
+  dom.comboCallout.classList.remove("is-active", "is-all-clear");
+  dom.comboCallout.classList.add("is-break");
+  requestAnimationFrame(() => dom.comboCallout.classList.add("is-active"));
+  effectTimers.combo = window.setTimeout(() => dom.comboCallout.classList.remove("is-active", "is-break"), 950);
 }
 
 function showScoreBurst(points, label = "") {
+  if (points <= 0) return;
+  window.clearTimeout(effectTimers.score);
   dom.scoreBurst.textContent = label ? `${label} · +${numberFormatter.format(points)}` : `+${numberFormatter.format(points)}`;
   dom.scoreBurst.classList.remove("is-active");
   requestAnimationFrame(() => dom.scoreBurst.classList.add("is-active"));
-  window.setTimeout(() => dom.scoreBurst.classList.remove("is-active"), 820);
+  effectTimers.score = window.setTimeout(() => dom.scoreBurst.classList.remove("is-active"), 820);
 }
 
-function burstParticles(x, y, count = 18) {
+function burstParticles(x, y, count = 18, { distanceMin = 42, distanceMax = 142, spark = false } = {}) {
   if (settings.reducedMotion) return;
-  const colors = ["#75efff", "#d49bff", "#ff9fb8", "#ffe19b", "#8bf4d7"];
+  const colors = ["#75efff", "#d49bff", "#ff9fb8", "#ffe19b", "#ffffff", "#8bf4d7"];
 
   for (let index = 0; index < count; index += 1) {
     const particle = document.createElement("i");
-    const angle = (Math.PI * 2 * index) / count + Math.random() * 0.34;
-    const distance = 42 + Math.random() * 100;
-    particle.className = "particle";
+    const angle = (Math.PI * 2 * index) / count + Math.random() * 0.52;
+    const distance = distanceMin + Math.random() * Math.max(1, distanceMax - distanceMin);
+    particle.className = `particle${spark && index % 2 === 0 ? " particle--spark" : ""}`;
     particle.style.left = `${x}px`;
     particle.style.top = `${y}px`;
     particle.style.setProperty("--dx", `${Math.cos(angle) * distance}px`);
     particle.style.setProperty("--dy", `${Math.sin(angle) * distance}px`);
-    particle.style.setProperty("--spin", `${Math.round(Math.random() * 420 - 210)}deg`);
-    particle.style.setProperty("--size", `${3 + Math.random() * 5}px`);
+    particle.style.setProperty("--spin", `${Math.round(Math.random() * 620 - 310)}deg`);
+    particle.style.setProperty("--size", `${2.5 + Math.random() * 5.5}px`);
     particle.style.setProperty("--particle-color", colors[index % colors.length]);
-    particle.style.animationDelay = `${Math.random() * 80}ms`;
+    particle.style.setProperty("--particle-duration", `${720 + Math.random() * 430}ms`);
+    particle.style.animationDelay = `${Math.random() * 95}ms`;
     dom.particleLayer.append(particle);
     particle.addEventListener("animationend", () => particle.remove(), { once: true });
   }
 }
 
-function createGhost(piece) {
+function createGhost(piece, clientX, clientY) {
   removeGhost();
   const firstCell = dom.board.querySelector(".board-cell");
   if (!firstCell) return null;
@@ -560,22 +722,45 @@ function createGhost(piece) {
   ghost.className = "drag-ghost";
   ghost.style.setProperty("--ghost-cell", `${cellRect.width}px`);
   ghost.style.setProperty("--ghost-gap", `${gap}px`);
+  ghost.style.setProperty("--ghost-x", `${clientX}px`);
+  ghost.style.setProperty("--ghost-y", `${clientY - getDragLift()}px`);
   ghost.append(createPieceGrid(piece, "drag"));
   dom.dragLayer.append(ghost);
   activeGhost = ghost;
+
+  const now = performance.now();
+  dragState.visual = {
+    currentX: clientX,
+    currentY: clientY - getDragLift(),
+    targetX: clientX,
+    targetY: clientY - getDragLift(),
+    lastFrameAt: now,
+    activationAt: now,
+    targetUpdatedAt: now,
+    lastMeasuredUpdateAt: -1,
+    measuredFirstFrame: false
+  };
+  dragAnimationFrame = requestAnimationFrame(renderDragFrame);
   return ghost;
 }
 
-function updateDrag(clientX, clientY) {
+function getDragLift() {
+  return Math.min(
+    GAME_FEEL.dragLiftMax,
+    Math.max(GAME_FEEL.dragLiftMin, window.innerHeight * GAME_FEEL.dragLiftRatio)
+  );
+}
+
+function updateDragTarget(clientX, clientY) {
   if (!dragState?.active) return;
   const piece = state.tray[dragState.index];
   if (!piece || !activeGhost) return;
 
-  const lift = Math.min(92, window.innerHeight * 0.115);
   const ghostX = clientX;
-  const ghostY = clientY - lift;
-  activeGhost.style.left = `${ghostX}px`;
-  activeGhost.style.top = `${ghostY}px`;
+  const ghostY = clientY - getDragLift();
+  dragState.visual.targetX = ghostX;
+  dragState.visual.targetY = ghostY;
+  dragState.visual.targetUpdatedAt = performance.now();
 
   const firstCell = dom.board.querySelector(".board-cell");
   if (!firstCell) return;
@@ -591,6 +776,41 @@ function updateDrag(clientX, clientY) {
   dragState.anchor = { row, col, valid };
   activeGhost.classList.toggle("is-invalid", !valid);
   setPreview(piece, row, col, valid);
+}
+
+function renderDragFrame(timestamp) {
+  if (!dragState?.active || !dragState.visual || !activeGhost) {
+    dragAnimationFrame = null;
+    return;
+  }
+
+  const visual = dragState.visual;
+  const elapsed = Math.min(40, Math.max(1, timestamp - visual.lastFrameAt));
+  const follow = settings.reducedMotion
+    ? 1
+    : 1 - Math.exp((-GAME_FEEL.dragFollowSharpness * elapsed) / 1_000);
+  visual.currentX += (visual.targetX - visual.currentX) * follow;
+  visual.currentY += (visual.targetY - visual.currentY) * follow;
+  visual.lastFrameAt = timestamp;
+  activeGhost.style.setProperty("--ghost-x", `${visual.currentX.toFixed(2)}px`);
+  activeGhost.style.setProperty("--ghost-y", `${visual.currentY.toFixed(2)}px`);
+
+  if (!visual.measuredFirstFrame) {
+    recordMetric(inputMetrics.activationToFrame, Math.max(0, timestamp - visual.activationAt));
+    visual.measuredFirstFrame = true;
+  }
+  if (visual.targetUpdatedAt !== visual.lastMeasuredUpdateAt) {
+    recordMetric(inputMetrics.moveToFrame, Math.max(0, timestamp - visual.targetUpdatedAt));
+    visual.lastMeasuredUpdateAt = visual.targetUpdatedAt;
+  }
+
+  dragAnimationFrame = requestAnimationFrame(renderDragFrame);
+}
+
+function recordMetric(bucket, value) {
+  if (!Number.isFinite(value) || value < 0) return;
+  bucket.push(Number(value.toFixed(2)));
+  if (bucket.length > GAME_FEEL.metricSampleLimit) bucket.shift();
 }
 
 function setPreview(piece, row, col, valid) {
@@ -610,6 +830,8 @@ function clearPreview() {
 }
 
 function removeGhost() {
+  if (dragAnimationFrame !== null) cancelAnimationFrame(dragAnimationFrame);
+  dragAnimationFrame = null;
   activeGhost?.remove();
   activeGhost = null;
 }
@@ -618,36 +840,48 @@ function onPiecePointerDown(event) {
   const card = event.target.closest(".piece-card:not(:disabled)");
   if (!card || isLocked || !state.started) return;
   clearHint();
+  try {
+    card.setPointerCapture(event.pointerId);
+  } catch {
+    // Global pointer listeners still preserve the drag outside the tray.
+  }
   dragState = {
     pointerId: event.pointerId,
     index: Number(card.dataset.pieceIndex),
     startX: event.clientX,
     startY: event.clientY,
     active: false,
-    anchor: null
+    anchor: null,
+    sourceCard: card,
+    visual: null
   };
 }
 
 function onPointerMove(event) {
   if (!dragState || event.pointerId !== dragState.pointerId) return;
-  const distance = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY);
+  const coalesced = event.getCoalescedEvents?.() || [];
+  const point = coalesced[coalesced.length - 1] || event;
+  const distance = Math.hypot(point.clientX - dragState.startX, point.clientY - dragState.startY);
 
-  if (!dragState.active && distance > 7) {
+  if (!dragState.active && distance >= GAME_FEEL.dragThreshold) {
     dragState.active = true;
     selectPiece(dragState.index, { announceSelection: false, playSound: true });
-    createGhost(state.tray[dragState.index]);
+    dragState.sourceCard.classList.add("is-dragging");
+    createGhost(state.tray[dragState.index], point.clientX, point.clientY);
   }
 
   if (dragState.active) {
     event.preventDefault();
-    updateDrag(event.clientX, event.clientY);
+    updateDragTarget(point.clientX, point.clientY);
   }
 }
 
 async function onPointerUp(event) {
   if (!dragState || event.pointerId !== dragState.pointerId) return;
+  if (dragState.active) updateDragTarget(event.clientX, event.clientY);
   const finishedDrag = dragState;
   dragState = null;
+  finishedDrag.sourceCard?.classList.remove("is-dragging");
 
   if (finishedDrag.active) {
     suppressClickUntil = performance.now() + 380;
@@ -665,6 +899,7 @@ async function onPointerUp(event) {
 
 function onPointerCancel(event) {
   if (!dragState || event.pointerId !== dragState.pointerId) return;
+  dragState.sourceCard?.classList.remove("is-dragging");
   dragState = null;
   clearPreview();
   removeGhost();
@@ -768,6 +1003,8 @@ function newGame({ keepDialog = false } = {}) {
     score: 0,
     lines: 0,
     combo: 0,
+    comboGrace: 0,
+    materialIndex: 0,
     moves: 0,
     best,
     started: true,
@@ -1000,6 +1237,8 @@ function wireEvents() {
   });
 
   window.addEventListener("resize", () => {
+    dragState?.sourceCard?.classList.remove("is-dragging");
+    dragState = null;
     clearPreview();
     removeGhost();
   });
@@ -1018,8 +1257,66 @@ function wait(milliseconds) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
+function summarizeMetric(values) {
+  if (!values.length) return { count: 0, average: 0, p95: 0, max: 0, samples: [] };
+  const sorted = [...values].sort((a, b) => a - b);
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return {
+    count: values.length,
+    average: Number(average.toFixed(2)),
+    p95: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))],
+    max: sorted[sorted.length - 1],
+    samples: [...values]
+  };
+}
+
+function loadTestScenario(scenario) {
+  if (!isValidBoard(scenario?.board) || !Array.isArray(scenario?.tray) || scenario.tray.length !== 3) {
+    throw new TypeError("Invalid LUMINA test scenario");
+  }
+
+  const tray = scenario.tray.map((piece, index) => {
+    if (piece === null) return null;
+    const shape = getShape(piece.shapeId);
+    if (!shape) throw new TypeError(`Unknown test shape in slot ${index}`);
+    return {
+      id: piece.id || `test-${shape.id}-${index}`,
+      shapeId: shape.id,
+      label: shape.label,
+      palette: PALETTES.includes(piece.palette) ? piece.palette : PALETTES[index % PALETTES.length],
+      cells: shape.cells.map((cell) => [...cell])
+    };
+  });
+
+  state = {
+    ...state,
+    board: scenario.board.map((row) => [...row]),
+    tray,
+    score: asNonNegativeInteger(scenario.score),
+    lines: asNonNegativeInteger(scenario.lines),
+    combo: asNonNegativeInteger(scenario.combo),
+    comboGrace: Math.min(COMBO_GRACE_MOVES, asNonNegativeInteger(scenario.comboGrace)),
+    materialIndex: asNonNegativeInteger(scenario.materialIndex) % MATERIALS.length,
+    moves: asNonNegativeInteger(scenario.moves),
+    started: true,
+    gameOver: false
+  };
+  selectedPieceIndex = null;
+  isLocked = false;
+  suppressClickUntil = 0;
+  dom.trayHint.textContent = "Touchez ou faites glisser une pièce";
+  renderAll();
+}
+
 window.__LUMINA_TEST__ = Object.freeze({
   getState: () => JSON.parse(JSON.stringify(state)),
+  getInputMetrics: () => ({
+    activationToFrame: summarizeMetric(inputMetrics.activationToFrame),
+    moveToFrame: summarizeMetric(inputMetrics.moveToFrame),
+    tuning: { ...GAME_FEEL }
+  }),
+  loadScenario: (scenario) => loadTestScenario(scenario),
+  placePiece: (index, row, col) => commitPlacement(index, row, col),
   newGame: () => newGame(),
   selectPiece: (index) => selectPiece(index, { announceSelection: false, playSound: false })
 });

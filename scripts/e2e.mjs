@@ -34,7 +34,7 @@ try {
   } finally {
     await browser.close();
   }
-  process.stdout.write("Browser verification passed: tactile placement, settings, pause, 3 responsive viewports, and zero axe violations.\n");
+  process.stdout.write("Browser verification passed: interpolated drag, zero-point placement, combo clear, material shift, all-clear VFX, settings, pause, 3 responsive viewports, and zero axe violations.\n");
 } finally {
   server.kill("SIGTERM");
 }
@@ -65,12 +65,36 @@ async function verifyPrimaryMobile(browser) {
   assert.equal(await page.locator(".piece-card").count(), 3);
   await assertNoOverflow(page, "390x844");
 
-  await page.locator(".piece-card:not(:disabled)").first().click();
-  const validCell = page.locator('.board-cell[data-valid-anchor="true"]').first();
-  await validCell.waitFor();
-  await validCell.click();
-  await page.waitForFunction(() => Number(document.querySelector("#scoreValue")?.textContent?.replace(/\D/g, "")) > 0);
+  await dragFirstPiece(page);
   assert.equal(await page.locator(".piece-card:disabled").count(), 1);
+  assert.equal((await page.evaluate(() => window.__LUMINA_TEST__.getState())).score, 0, "a simple placement must award no points");
+
+  const dragMetrics = await page.evaluate(() => window.__LUMINA_TEST__.getInputMetrics());
+  assert.ok(dragMetrics.activationToFrame.count >= 1, `Missing activation metric: ${JSON.stringify(dragMetrics)}`);
+  assert.ok(dragMetrics.moveToFrame.count >= 1, `Missing move metric: ${JSON.stringify(dragMetrics)}`);
+  assert.ok(dragMetrics.moveToFrame.p95 < 80, `Drag response p95 is too high: ${JSON.stringify(dragMetrics)}`);
+
+  await loadLineClearScenario(page, { allClear: false });
+  assert.equal(await page.evaluate(() => window.__LUMINA_TEST__.placePiece(0, 0, 7)), true);
+  assert.equal(await page.locator("#comboCallout").getAttribute("data-effect"), "clear");
+  await page.waitForFunction(() => document.body.dataset.material === "opal");
+  const clearState = await page.evaluate(() => window.__LUMINA_TEST__.getState());
+  assert.equal(clearState.score, 100);
+  assert.equal(clearState.combo, 1);
+  assert.equal(clearState.comboGrace, 3);
+  assert.equal(await page.locator("#comboBadge.is-visible").count(), 1);
+
+  await loadLineClearScenario(page, { allClear: true });
+  assert.equal(await page.evaluate(() => window.__LUMINA_TEST__.placePiece(0, 0, 7)), true);
+  assert.equal(await page.locator("#comboCallout").getAttribute("data-effect"), "all-clear");
+  await page.waitForTimeout(120);
+  await page.screenshot({ path: fileURLToPath(new URL("all-clear-explosion.png", resultsDir)), fullPage: true });
+  await page.waitForFunction(() => document.body.dataset.material === "opal");
+  const allClearState = await page.evaluate(() => window.__LUMINA_TEST__.getState());
+  assert.equal(allClearState.score, 2_600);
+  assert.ok(allClearState.board.every((row) => row.every((cell) => cell === null)));
+
+  await captureMaterialStates(page);
 
   await page.locator("#settingsButton").click();
   await page.locator("#motionToggle").check({ force: true });
@@ -89,6 +113,85 @@ async function verifyPrimaryMobile(browser) {
   await page.screenshot({ path: fileURLToPath(new URL("mobile-390x844.png", resultsDir)), fullPage: true });
   assert.deepEqual(consoleErrors, [], `Console errors: ${consoleErrors.join(" | ")}`);
   await context.close();
+}
+
+async function dragFirstPiece(page) {
+  const start = await page.locator(".piece-card:not(:disabled)").first().boundingBox();
+  assert.ok(start, "The first piece card has no box");
+  const geometry = await page.evaluate(() => {
+    const piece = window.__LUMINA_TEST__.getState().tray[0];
+    const cell = document.querySelector(".board-cell");
+    const board = document.querySelector("#board");
+    const rect = cell.getBoundingClientRect();
+    const style = getComputedStyle(board);
+    const stepX = rect.width + (Number.parseFloat(style.columnGap) || 0);
+    const stepY = rect.height + (Number.parseFloat(style.rowGap) || 0);
+    const rows = Math.max(...piece.cells.map(([row]) => row)) + 1;
+    const cols = Math.max(...piece.cells.map(([, col]) => col)) + 1;
+    const anchorRow = Math.floor((8 - rows) / 2);
+    const anchorCol = Math.floor((8 - cols) / 2);
+    const tuning = window.__LUMINA_TEST__.getInputMetrics().tuning;
+    const lift = Math.min(tuning.dragLiftMax, Math.max(tuning.dragLiftMin, innerHeight * tuning.dragLiftRatio));
+    return {
+      x: rect.left + rect.width / 2 + stepX * (anchorCol + (cols - 1) / 2),
+      y: rect.top + rect.height / 2 + stepY * (anchorRow + (rows - 1) / 2) + lift
+    };
+  });
+
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(geometry.x, geometry.y, { steps: 18 });
+  await page.locator(".drag-ghost").waitFor();
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelectorAll(".piece-card:disabled").length === 1);
+}
+
+async function loadLineClearScenario(page, { allClear }) {
+  await page.evaluate(({ allClear: shouldClearAll }) => {
+    const board = Array.from({ length: 8 }, () => Array(8).fill(null));
+    for (let col = 0; col < 7; col += 1) board[0][col] = "gold";
+    if (!shouldClearAll) board[2][2] = "mint";
+    window.__LUMINA_TEST__.loadScenario({
+      board,
+      tray: [{ shapeId: "spark", palette: "coral" }, null, null],
+      score: 0,
+      lines: 0,
+      combo: 0,
+      comboGrace: 0,
+      materialIndex: 0,
+      moves: 0
+    });
+  }, { allClear });
+  await page.waitForFunction(() => document.body.dataset.material === "prism");
+}
+
+async function captureMaterialStates(page) {
+  for (const material of [
+    { id: "opal", index: 1 },
+    { id: "solar", index: 2 },
+    { id: "void", index: 3 }
+  ]) {
+    await page.evaluate(({ materialIndex }) => {
+      const palettes = ["cyan", "violet", "coral", "gold", "mint"];
+      const board = Array.from({ length: 8 }, (_, row) =>
+        Array.from({ length: 8 }, (_, col) => ((row + col) % 3 === 0 ? palettes[(row + col) % palettes.length] : null))
+      );
+      window.__LUMINA_TEST__.loadScenario({
+        board,
+        tray: [
+          { shapeId: "trio-h", palette: "mint" },
+          { shapeId: "corner-br", palette: "violet" },
+          { shapeId: "square-2", palette: "gold" }
+        ],
+        materialIndex,
+        score: 0,
+        combo: 0,
+        comboGrace: 0
+      });
+    }, { materialIndex: material.index });
+    await page.waitForFunction((expected) => document.body.dataset.material === expected, material.id);
+    await page.screenshot({ path: fileURLToPath(new URL(`material-${material.id}.png`, resultsDir)), fullPage: true });
+  }
 }
 
 async function verifyViewport(browser, viewport, filename, mobile = true) {
